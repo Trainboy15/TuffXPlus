@@ -691,59 +691,59 @@ public class Y0Plugin {
         });
     }
 
-private byte[] csp(ChunkSnapshot s, int x, int z, int sy, Object2ObjectOpenHashMap<BlockData, int[]> c) throws IOException {
-    // Ensure thread-local buffer is exactly 12,288 bytes to prevent overflow
-    byte[] bd = tlbd.get(); 
-    int idx = 0;
-    boolean hasContent = false;
-    int by = sy << 4;
-
-    // Optimized Loop Order: Matches standard Minecraft internal memory layouts
-    for (int xx = 0; xx < 16; xx++) {
-        for (int zz = 0; zz < 16; zz++) {
-            for (int y = 0; y < 16; y++) {
-                int wy = by + y;
-                
-                BlockData bdata = s.getBlockData(xx, wy, zz);
-                int[] ld = c.get(bdata); // Fast map lookup
-                
-                if (ld == null) { // Avoid getOrDefault overhead
-                    ld = (v != null) ? v.toLegacy(bdata) : EMPTY_LEGACY;
-                    c.put(bdata, ld);
-                }
-
-                // Bitwise packing
-                short lb = (short) ((ld[1] << 12) | (ld[0] & 0xFFF));
-                byte pl = (byte) ((s.getBlockSkyLight(xx, wy, zz) << 4) | s.getBlockEmittedLight(xx, wy, zz));
-
-                // Write sequence
-                bd[idx++] = (byte) (lb >> 8);
-                bd[idx++] = (byte) lb;
-                bd[idx++] = pl;
-
-                if (lb != 0 || pl != 0) {
-                    hasContent = true;
+    private byte[] csp(ChunkSnapshot s, int x, int z, int sy, Object2ObjectOpenHashMap<BlockData, int[]> c) throws IOException {
+        // Ensure thread-local buffer is exactly 12,288 bytes to prevent overflow
+        byte[] bd = tlbd.get(); 
+        int idx = 0;
+        boolean hasContent = false;
+        int by = sy << 4;
+    
+        // Optimized Loop Order: Matches standard Minecraft internal memory layouts
+        for (int xx = 0; xx < 16; xx++) {
+            for (int zz = 0; zz < 16; zz++) {
+                for (int y = 0; y < 16; y++) {
+                    int wy = by + y;
+                    
+                    BlockData bdata = s.getBlockData(xx, wy, zz);
+                    int[] ld = c.get(bdata); // Fast map lookup
+                    
+                    if (ld == null) { // Avoid getOrDefault overhead
+                        ld = (v != null) ? v.toLegacy(bdata) : EMPTY_LEGACY;
+                        c.put(bdata, ld);
+                    }
+    
+                    // Bitwise packing
+                    short lb = (short) ((ld[1] << 12) | (ld[0] & 0xFFF));
+                    byte pl = (byte) ((s.getBlockSkyLight(xx, wy, zz) << 4) | s.getBlockEmittedLight(xx, wy, zz));
+    
+                    // Write sequence
+                    bd[idx++] = (byte) (lb >> 8);
+                    bd[idx++] = (byte) lb;
+                    bd[idx++] = pl;
+    
+                    if (lb != 0 || pl != 0) {
+                        hasContent = true;
+                    }
                 }
             }
         }
-    }
-
-    if (!hasContent) return null;
-
-    ByteArrayOutputStream b = tlos.get();
-    b.reset();
-
-    // DataOutputStream wrapper safely writes schema
-    try (DataOutputStream o = new DataOutputStream(b)) {
-        o.writeUTF("chunk_data");
-        o.writeInt(x);
-        o.writeInt(z);
-        o.writeInt(sy);
-        o.write(bd, 0, idx);
-    }
     
-    return b.toByteArray(); 
-}
+        if (!hasContent) return null;
+    
+        ByteArrayOutputStream b = tlos.get();
+        b.reset();
+    
+        // DataOutputStream wrapper safely writes schema
+        try (DataOutputStream o = new DataOutputStream(b)) {
+            o.writeUTF("chunk_data");
+            o.writeInt(x);
+            o.writeInt(z);
+            o.writeInt(sy);
+            o.write(bd, 0, idx);
+        }
+        
+        return b.toByteArray(); 
+    }
 
     public void handleBlockBreak(BlockBreakEvent e) { 
         if (e.getBlock().getY() < 0) {
