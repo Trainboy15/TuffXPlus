@@ -1,0 +1,68 @@
+name: Gradle Build
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - "builds/**"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: permissions
+        run: chmod +x gradlew
+
+      - name: build
+        run: ./gradlew --no-daemon build
+
+      - name: copy jar to builds
+        run: |
+          mkdir -p builds
+          cp build/libs/*.jar builds/
+
+      - name: push jar
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add builds/
+          if git diff --cached --quiet; then
+            echo "No build artifact changes to commit."
+            exit 0
+          fi
+          git commit -m "Update build artifact"
+          git push
+
+      - name: Deploy to Testers Repo
+        env:
+          TOKEN: ${{ secrets.VERSION_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${TOKEN}@github.com/tuffnetwork/testers.git deploy_repo
+          cd deploy_repo
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          mkdir -p plugin-builds
+          cp -r ../builds/* "plugin-builds/"
+          
+
+          git add .
+          git commit -m "Upload build wowowow" || echo "No changes"
+          git push
