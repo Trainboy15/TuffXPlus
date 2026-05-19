@@ -35,7 +35,12 @@ public class TuffX extends JavaPlugin implements Listener, PluginMessageListener
     public ViaBlocksPlugin viaBlocksPlugin;
     public TuffActions tuffActions;
     public ViaEntitiesPlugin viaEntitiesPlugin;
+    public String latestAvailableVersion = null;
+
     private ChunkInjector chunkInjector;
+    private static final String CURRENT_VERSION = "1.0.0-patch";
+    private static final String BUILDS_API_URL = "https://api.github.com/repos/Trainboy15/TuffXPlus/contents/builds";
+
 
     @Override
     public void onLoad() {
@@ -87,6 +92,7 @@ public class TuffX extends JavaPlugin implements Listener, PluginMessageListener
         getServer().getPluginManager().registerEvents(this, this);
 
         setupRegistry();
+        checkForUpdates();
         lfe();
     }
 
@@ -158,6 +164,90 @@ public class TuffX extends JavaPlugin implements Listener, PluginMessageListener
         return true;
     }
 
+    public void getUpdates() {
+        getServer().getScheduler().runTaskAsynchronously(this, () -> {
+            try {
+                java.net.URL url = new java.net.URL(BUILDS_API_URL);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("Accept", "application/vnd.github+json");
+                conn.setRequestProperty("User-Agent", "TuffX-UpdateChecker");
+                conn.setConnectTimeout(5000);
+                conn.setReadTimeout(5000);
+
+                if (conn.getResponseCode() != 200) {
+                    getLogger().warning("[UpdateChecker] Failed to check for updates (HTTP " + conn.getResponseCode() + ")");
+                    return;
+                }
+
+                java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(conn.getInputStream())
+                );
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) response.append(line);
+                reader.close();
+                conn.disconnect();
+
+                // Parse filenames from JSON array — extract "name" fields
+                String raw = response.toString();
+                String latestVersion = null;
+                int searchFrom = 0;
+                while (true) {
+                    int nameIdx = raw.indexOf("\"name\":", searchFrom);
+                    if (nameIdx == -1) break;
+                    int start = raw.indexOf("\"", nameIdx + 7) + 1;
+                    int end = raw.indexOf("\"", start);
+                    String filename = raw.substring(start, end);
+                    // Only consider .jar files, strip extension
+                    if (filename.endsWith(".jar")) {
+                        String ver = filename.replace(".jar", "");
+                        if (latestVersion == null || compareVersions(ver, latestVersion) > 0) {
+                            latestVersion = ver;
+                        }
+                    }
+                    searchFrom = end;
+                }
+
+                if (latestVersion == null) {
+                    getLogger().warning("[UpdateChecker] No builds found in the repository.");
+                    return;
+                }
+
+                final String finalLatest = latestVersion;
+                if (!CURRENT_VERSION.equalsIgnoreCase(finalLatest)) {
+                    latestAvailableVersion = finalLatest;
+                    getLogger().warning("[UpdateChecker] A new version is available: " + finalLatest +
+                        " (you are running " + CURRENT_VERSION + ")");
+                    getLogger().warning("[UpdateChecker] Download: https://github.com/Trainboy15/TuffXPlus/tree/main/builds");
+                } else {
+                    getLogger().info("[UpdateChecker] TuffX is up to date (" + CURRENT_VERSION + ").");
+                }
+
+            } catch (Exception e) {
+                getLogger().warning("[UpdateChecker] Could not check for updates: " + e.getMessage());
+            }
+        });
+    }
+
+    // Simple version comparator — handles semver-style and suffix strings
+    private int compareVersions(String a, String b) {
+        // Strip non-numeric suffixes for comparison (e.g. "1.0.0-patch" → "1.0.0")
+        String[] partsA = a.replaceAll("-.*", "").split("\\.");
+        String[] partsB = b.replaceAll("-.*", "").split("\\.");
+        int len = Math.max(partsA.length, partsB.length);
+        for (int i = 0; i < len; i++) {
+            int numA = i < partsA.length ? parseIntSafe(partsA[i]) : 0;
+            int numB = i < partsB.length ? parseIntSafe(partsB[i]) : 0;
+            if (numA != numB) return Integer.compare(numA, numB);
+        }
+        return 0;
+    }
+
+    private int parseIntSafe(String s) {
+        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 0; }
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("tuffx")) return TuffXCommand(sender, command, label, args);
@@ -195,6 +285,15 @@ public class TuffX extends JavaPlugin implements Listener, PluginMessageListener
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent e) {
         y0Plugin.handlePlayerJoin(e);
+
+        if (latestAvailableVersion != null) {
+            Player p = e.getPlayer();
+            if (p.hasPermission("tuffx.admin") || p.isOp()) {
+                p.sendMessage("§e[TuffX] §fA new version is available: §a" + latestAvailableVersion +
+                    " §f(running §c" + CURRENT_VERSION + "§f)");
+                p.sendMessage("§e[TuffX] §fDownload: §bhttps://github.com/Trainboy15/TuffXPlus/tree/main/builds");
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
