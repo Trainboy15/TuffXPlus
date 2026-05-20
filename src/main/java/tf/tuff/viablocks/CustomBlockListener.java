@@ -266,28 +266,30 @@ public class CustomBlockListener {
     }
 
     private Map<Integer, List<Long>> findModernBlocksInChunk(ChunkSnapshot chunkSnapshot, int minHeight, int maxHeight) {
-        // Keep return signature standard Map<Integer, List<Long>> but use primitive backing under the hood
         Int2ObjectMap<LongList> foundBlocks = new Int2ObjectOpenHashMap<>();
-
+    
         int chunkX = chunkSnapshot.getX() << 4;
         int chunkZ = chunkSnapshot.getZ() << 4;
-
-        // Optimized Loop Order for 1.21.11 Chunk Snapshots: X -> Z -> Y
+    
         for (int x = 0; x < 16; x++) {
             int worldX = chunkX + x;
             for (int z = 0; z < 16; z++) {
                 int worldZ = chunkZ + z;
                 for (int y = minHeight; y < maxHeight; y++) {
-
-                    // Fetch BlockData ONCE. Do not look up BlockType separately.
-                    BlockData data = chunkSnapshot.getBlockData(x, y, z);
-                    Material blockType = data.getMaterial();
-
-                    if (blockType == Material.AIR || !this.modernMaterials.contains(blockType)) {
+                
+                    // Check material FIRST — getBlockType() returns an enum, no allocation
+                    Material blockType = chunkSnapshot.getBlockType(x, y, z);
+    
+                    if (blockType == Material.AIR
+                            || blockType == Material.CAVE_AIR
+                            || blockType == Material.VOID_AIR
+                            || !this.modernMaterials.contains(blockType)) {
                         continue;
                     }
-
-                    // Read from cache or update
+    
+                    // Only allocate BlockData for confirmed modern blocks
+                    BlockData data = chunkSnapshot.getBlockData(x, y, z);
+    
                     Integer cachedId = blockDataIdCache.getIfPresent(data);
                     int materialId;
                     if (cachedId != null) {
@@ -296,11 +298,9 @@ public class CustomBlockListener {
                         materialId = this.paletteManager.getOrCreateId(data.getAsString());
                         blockDataIdCache.put(data, materialId);
                     }
-
+    
                     if (materialId != -1) {
                         long packedLocation = packLocation(worldX, y, worldZ);
-
-                        // Fastutil native optimization prevents reference hunting
                         LongList locs = foundBlocks.get(materialId);
                         if (locs == null) {
                             locs = new LongArrayList();
@@ -311,11 +311,10 @@ public class CustomBlockListener {
                 }
             }
         }
-
-        // Cast safely back to original signature without copying elements
+    
         return (Map<Integer, List<Long>>) (Map<?, ?>) foundBlocks;
     }   
-
+    
     public byte[] getExtraDataForMultiBlock(World world, List<Long> locations) {
         Map<Integer, List<Long>> foundBlocks = new HashMap<>();
         

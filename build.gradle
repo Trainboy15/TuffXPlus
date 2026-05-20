@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'tf.tuff'
-version = '1.0.0-patch'
+version = '1.0.0-patch-2'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
