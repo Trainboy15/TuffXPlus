@@ -59,26 +59,13 @@ public class TuffX extends JavaPlugin implements Listener, PluginMessageListener
     public void onEnable() {
         PacketEvents.getAPI().init();
 
-        if (getConfig().getBoolean("y0-enabled",true)) {
-            y0Plugin.onTuffXEnable();
-        }
-
-        if (getConfig().getBoolean("viablocks-enabled",true)) {
-            viaBlocksPlugin.onTuffXEnable();
-        }
-
-        if (getConfig().getBoolean("viaentities-enabled",true)) {
-            viaEntitiesPlugin.onTuffXEnable();
-        }
-        
-        if (getConfig().getBoolean("y0-enabled",true) && getConfig().getBoolean("viablocks-enabled",true)) {
-            chunkInjector = new ChunkInjector(viaBlocksPlugin.blockListener, y0Plugin);
-            viaBlocksPlugin.blockListener.setChunkInjector(chunkInjector);
-            y0Plugin.setChunkInjector(chunkInjector);
-        }
-
-
-
+        y0Plugin.onTuffXEnable();
+        viaBlocksPlugin.onTuffXEnable();
+        viaEntitiesPlugin.onTuffXEnable();
+        chunkInjector = new ChunkInjector(viaBlocksPlugin.blockListener, y0Plugin);
+        viaBlocksPlugin.blockListener.setChunkInjector(chunkInjector);
+        y0Plugin.setChunkInjector(chunkInjector);
+    
         tuffActions.onTuffXEnable();
         
         saveDefaultConfig();
@@ -92,7 +79,6 @@ public class TuffX extends JavaPlugin implements Listener, PluginMessageListener
         getServer().getPluginManager().registerEvents(this, this);
 
         setupRegistry();
-        getUpdates();
         lfe();
     }
 
@@ -164,71 +150,6 @@ public class TuffX extends JavaPlugin implements Listener, PluginMessageListener
         return true;
     }
 
-    public void getUpdates() {
-        getServer().getScheduler().runTaskAsynchronously(this, () -> {
-            try {
-                java.net.URL url = new java.net.URL(BUILDS_API_URL);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("Accept", "application/vnd.github+json");
-                conn.setRequestProperty("User-Agent", "TuffX-UpdateChecker");
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-
-                if (conn.getResponseCode() != 200) {
-                    getLogger().warning("[UpdateChecker] Failed to check for updates (HTTP " + conn.getResponseCode() + ")");
-                    return;
-                }
-
-                java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(conn.getInputStream())
-                );
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) response.append(line);
-                reader.close();
-                conn.disconnect();
-
-                // Parse filenames from JSON array — extract "name" fields
-                String raw = response.toString();
-                String latestVersion = null;
-                int searchFrom = 0;
-                while (true) {
-                    int nameIdx = raw.indexOf("\"name\":", searchFrom);
-                    if (nameIdx == -1) break;
-                    int start = raw.indexOf("\"", nameIdx + 7) + 1;
-                    int end = raw.indexOf("\"", start);
-                    String filename = raw.substring(start, end);
-                    // Only consider .jar files, strip extension
-                    if (filename.endsWith(".jar")) {
-                        String ver = filename.replace(".jar", "");
-                        if (latestVersion == null || compareVersions(ver, latestVersion) > 0) {
-                            latestVersion = ver;
-                        }
-                    }
-                    searchFrom = end;
-                }
-
-                if (latestVersion == null) {
-                    getLogger().warning("[UpdateChecker] No builds found in the repository.");
-                    return;
-                }
-
-                final String finalLatest = latestVersion;
-                if (!CURRENT_VERSION.equalsIgnoreCase(finalLatest)) {
-                    latestAvailableVersion = finalLatest;
-                    getLogger().warning("[UpdateChecker] A new version is available: " + finalLatest +
-                        " (you are running " + CURRENT_VERSION + ")");
-                    getLogger().warning("[UpdateChecker] Download: https://github.com/Trainboy15/TuffXPlus/tree/main/builds");
-                } else {
-                    getLogger().info("[UpdateChecker] TuffX is up to date (" + CURRENT_VERSION + ").");
-                }
-
-            } catch (Exception e) {
-                getLogger().warning("[UpdateChecker] Could not check for updates: " + e.getMessage());
-            }
-        });
-    }
 
     // Simple version comparator — handles semver-style and suffix strings
     private int compareVersions(String a, String b) {
