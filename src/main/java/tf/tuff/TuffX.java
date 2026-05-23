@@ -63,10 +63,11 @@ public class TuffX extends JavaPlugin implements Listener, PluginMessageListener
         tuffActions.onTuffXEnable();
         viaBlocksPlugin.onTuffXEnable();
         viaEntitiesPlugin.onTuffXEnable();
+
         chunkInjector = new ChunkInjector(viaBlocksPlugin.blockListener, y0Plugin);
         viaBlocksPlugin.blockListener.setChunkInjector(chunkInjector);
         y0Plugin.setChunkInjector(chunkInjector);
-        
+
         saveDefaultConfig();
         getConfig().options().copyDefaults(true);
         saveConfig();
