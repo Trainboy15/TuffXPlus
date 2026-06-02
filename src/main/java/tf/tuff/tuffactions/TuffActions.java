@@ -13,7 +13,6 @@ import org.bukkit.GameMode;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.event.entity.EntityToggleGlideEvent;
 import org.bukkit.event.entity.EntityToggleSwimEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -43,7 +42,6 @@ public class TuffActions {
     }
 
     private void loadConfig() {
-        plugin.saveDefaultConfig();
         info("TuffActions has been enabled");
         info("Enabling features...");
 
@@ -59,12 +57,11 @@ public class TuffActions {
     }
 
     public void onTuffXEnable() {
-        PacketEvents.getAPI().init();
-
         this.swimmingManager = new Swimming(this);
         this.creativeManager = new CreativeMenu(this);
         this.restrictions = new Restrictions(this);
 
+        plugin.getConfig().options().copyDefaults(true);
         loadConfig();
         info("Finished enabling features.");
 
@@ -78,17 +75,13 @@ public class TuffActions {
     }
 
     public void handlePacket(Player player, byte[] message) {
-        if (player == null || message == null || message.length < 13) {
-            return;
-        }
+        if (player == null || message == null || message.length < 13) return;
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(message))) {
             in.readInt();
             in.readInt();
             in.readInt();
             int actionLength = in.readUnsignedByte();
-            if (actionLength == 0 || in.available() < actionLength) {
-                return;
-            }
+            if (actionLength == 0 || in.available() < actionLength) return;
             byte[] actionBytes = new byte[actionLength];
             in.readFully(actionBytes);
             String action = new String(actionBytes, StandardCharsets.UTF_8);
@@ -105,13 +98,9 @@ public class TuffActions {
                 creativeManager.handleCreativeReady(player);
             } else if ("give_creative_item".equals(action)){
                 if (!creativeManager.isEnabled()) return;
-                if (player.getGameMode() != GameMode.CREATIVE) {
-                    return;
-                }
+                if (player.getGameMode() != GameMode.CREATIVE) return;
                 int itemLength = in.readUnsignedByte();
-                if (in.available() < itemLength + Integer.BYTES) {
-                    return;
-                }
+                if (in.available() < itemLength + Integer.BYTES) return;
                 byte[] itemBytes = new byte[itemLength];
                 in.readFully(itemBytes);
                 String item = new String(itemBytes, StandardCharsets.UTF_8);
@@ -119,13 +108,9 @@ public class TuffActions {
                 creativeManager.handlePlaceholderTaken(player, item, amount);
             } else if ("pick_viablock".equals(action)){
                 if (!creativeManager.isEnabled()) return;
-                if (player.getGameMode() != GameMode.CREATIVE) {
-                    return;
-                }
+                if (player.getGameMode() != GameMode.CREATIVE) return;
                 int blockLength = in.readUnsignedByte();
-                if (in.available() < blockLength + 1) {
-                    return;
-                }
+                if (in.available() < blockLength + 1) return;
                 byte[] blockBytes = new byte[blockLength];
                 in.readFully(blockBytes);
                 String blockName = new String(blockBytes, StandardCharsets.UTF_8);
@@ -144,24 +129,18 @@ public class TuffActions {
     }
 
     public void sendPluginMessage(Player player, String channel, byte[] payload) {
-        if (player == null || payload == null || !player.isOnline() || !PacketEvents.getAPI().isInitialized()) {
-            return;
-        }
+        if (player == null || payload == null || !player.isOnline() || !PacketEvents.getAPI().isInitialized()) return;
         WrapperPlayServerPluginMessage packet = new WrapperPlayServerPluginMessage(channel, payload);
         PacketEvents.getAPI().getPlayerManager().sendPacket(player, packet);
     }
 
     public void handlePlayerQuit(PlayerQuitEvent event) {
-        swimmingManager.handleSwimQuit(event);
+        swimmingManager.handlePlayerQuit(event);
         tuffPlayers.remove(event.getPlayer().getUniqueId());
     }
 
     public void handleToggleSwim(EntityToggleSwimEvent event) {
         swimmingManager.handleToggleSwim(event);
-    }
-
-    public void handleToggleGlide(EntityToggleGlideEvent event) {
-        swimmingManager.handleToggleGlide(event);
     }
 
     public void handlePlayerInventoryClick(InventoryClickEvent event) {
