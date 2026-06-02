@@ -268,9 +268,7 @@ public class CustomBlockListener {
         int chunkZ = chunkSnapshot.getZ() << 4;
     
         for (int x = 0; x < 16; x++) {
-            int worldX = chunkX + x;
             for (int z = 0; z < 16; z++) {
-                int worldZ = chunkZ + z;
                 for (int y = minHeight; y < maxHeight; y++) {
                 
                     // Check material FIRST — getBlockType() returns an enum, no allocation
@@ -296,7 +294,7 @@ public class CustomBlockListener {
                     }
     
                     if (materialId != -1) {
-                        long packedLocation = packLocation(worldX, y, worldZ);
+                        long packedLocation = packLocation(chunkX + x, y, chunkZ + z);
                         LongList locs = foundBlocks.get(materialId);
                         if (locs == null) {
                             locs = new LongArrayList();
