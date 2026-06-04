@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -676,6 +677,7 @@ public class Y0Plugin {
     private byte[] createSectionPayload(ChunkSnapshot s, int x, int z, int sy, Object2ObjectOpenHashMap<BlockData, int[]> c) throws IOException {
         // Ensure thread-local buffer is exactly 12,288 bytes to prevent overflow
         byte[] bd = threadData.get();
+        Arrays.fill(bd, (byte) 0);
         int idx = 0;
         boolean hasContent = false;
         int by = sy << 4;
@@ -699,9 +701,11 @@ public class Y0Plugin {
                     byte pl = (byte) ((s.getBlockSkyLight(xx, wy, zz) << 4) | s.getBlockEmittedLight(xx, wy, zz));
 
                     // Write sequence
-                    bd[idx++] = (byte) (lb >> 8);
-                    bd[idx++] = (byte) lb;
-                    bd[idx++] = pl;
+                    int linear = ((y << 8) | (zz << 4) | xx) * 3;
+                    bd[linear] = (byte) (lb >> 8);
+                    bd[linear + 1] = (byte) lb;
+                    bd[linear + 2] = pl;
+                    if (linear + 3 > idx) idx = linear + 3;
 
                     if (lb != 0 || pl != 0) {
                         hasContent = true;
